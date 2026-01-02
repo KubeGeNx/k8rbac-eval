@@ -1,110 +1,15 @@
-package access
+package generator
 
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-	"github.com/vasudevchavan/k8s-get-access-level/util"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 )
 
-var verbs []string
-
-var GenerateCmd = &cobra.Command{
-	Use:   "generate",
-	Short: "generate access manifests for user and service account",
-}
-
-var GenerateUserCmd = &cobra.Command{
-	Use:   "user [username]",
-	Short: "Generate Role/Binding for a user",
-	Args:  cobra.ExactArgs(1),
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// Use ValidateCommonFlags but we might need lenient validation if some flags like --namespace are optional for cluster roles
-		// But ValidateCommonFlags enforces namespace logic which is good.
-		return ValidateCommonFlags(cmd, args)
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runGenerate(args[0], false)
-	},
-}
-
-var GenerateSaCmd = &cobra.Command{
-	Use:   "sa [serviceaccount]",
-	Short: "Generate Role/Binding for a service account",
-	Args:  cobra.ExactArgs(1),
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		return ValidateCommonFlags(cmd, args)
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runGenerate(args[0], true)
-	},
-}
-
-func init() {
-	GenerateCmd.AddCommand(GenerateUserCmd)
-	GenerateCmd.AddCommand(GenerateSaCmd)
-
-	addCommonFlags(GenerateUserCmd)
-	addCommonFlags(GenerateSaCmd)
-
-	GenerateUserCmd.Flags().StringSliceVar(&verbs, "verb", []string{"get", "list", "watch"}, "Verbs for the role")
-	GenerateSaCmd.Flags().StringSliceVar(&verbs, "verb", []string{"get", "list", "watch"}, "Verbs for the role")
-}
-
-func runGenerate(name string, isServiceAccount bool) error {
-	clientset, err := util.GetClientset()
-	if err != nil {
-		return err
-	}
-
-	// Resolve resource aliases if provided
-	if resource != "" {
-		resolved, err := util.ResolveResourceName(clientset.Discovery(), resource)
-		if err != nil {
-			return err
-		}
-		resource = resolved
-	} else {
-		return fmt.Errorf("resource must be specified via --resource")
-	}
-
-	resolver, err := util.NewResourceScopeResolver(clientset.Discovery())
-	if err != nil {
-		return err
-	}
-
-	namespaced, err := resolver.IsNamespaced(resource)
-	if err != nil {
-		return err
-	}
-
-	if namespaced && clusterScope {
-		return fmt.Errorf("cannot use --clusterscope with namespaced resource %s", resource)
-	}
-
-	// Try to resolve group
-	var group string
-	gvr, err := resolver.ResourceFor(resource)
-	if err == nil {
-		group = gvr.Group
-	}
-
-	roleBytes, bindingBytes, err := generateManifests(name, isServiceAccount, resource, group, verbs, userNamespace, namespaced)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(string(roleBytes))
-	fmt.Println("---")
-	fmt.Println(string(bindingBytes))
-
-	return nil
-}
-
-func generateManifests(
+// GenerateManifests generates RBAC manifests (Role/Binding or ClusterRole/Binding).
+func GenerateManifests(
 	name string,
 	isServiceAccount bool,
 	resource string,

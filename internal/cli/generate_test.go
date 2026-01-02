@@ -1,9 +1,10 @@
-package access
+package cli
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vasudevchavan/k8s-get-access-level/pkg/generator"
 )
 
 func TestGenerateManifests(t *testing.T) {
@@ -59,7 +60,7 @@ func TestGenerateManifests(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			roleBytes, bindingBytes, err := generateManifests(
+			roleBytes, bindingBytes, err := generator.GenerateManifests(
 				tt.userName,
 				tt.isServiceAccount,
 				tt.resource,

@@ -1,4 +1,4 @@
-package access
+package cli
 
 import (
 	"github.com/spf13/cobra"
@@ -12,6 +12,4 @@ var AccessCmd = &cobra.Command{
 func init() {
 	AccessCmd.AddCommand(UserCmd)
 	AccessCmd.AddCommand(SaCmd)
-	AccessCmd.AddCommand(GenerateCmd)
-	AccessCmd.AddCommand(VersionCmd)
 }
